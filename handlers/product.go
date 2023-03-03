@@ -58,6 +58,39 @@ func (h *productHandler) GetProducts(c echo.Context) error {
 	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convProduct(products)})
 }
 
+func (h *productHandler) UpdateProducts(c echo.Context) error {
+	request := new(dto.UpdateProductRequest)
+	if err := c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest,result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+	}
+	id, _:= strconv.Atoi(c.Param("id"))
+
+	product, err := h.ProductRepository.GetProduct(id)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+	} 
+		if request.Name != ""{
+		product.Name = request.Name
+	} 
+		if request.Price != 0 {
+		product.Price = request.Price
+	} 
+		if request.Description != "" {
+		product.Description = request.Description
+	} 	
+		if request.Stock != 0 {
+		product.Stock = request.Stock
+	} 
+		if request.Photo != "" {
+		product.Photo = request.Photo
+	} 
+		data, err := h.ProductRepository.UpdateProduct(product, id)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError,result.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
+		}
+		return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convProduct(data)})
+}
+
 func convProduct (u models.Product) dto.ProductResponse{
 	return dto.ProductResponse{
 		ID: u.ID,

@@ -10,6 +10,8 @@ type ProductRepository interface {
 	FindProduct() ([]models.Product, error)
 	CreateProducts(product models.Product)(models.Product, error)
 	GetProduct(ID int) (models.Product, error)
+	UpdateProduct(product models.Product, ID int) (models.Product, error)
+
 
 }
 
@@ -32,4 +34,8 @@ func (r *repository) GetProduct(ID int) (models.Product, error) {
 	err := r.db.First(&products, ID).Error
 
 	return products, err
+}
+func (r *repository) UpdateProduct(product models.Product, ID int) (models.Product,error) {
+	err := r.db.Save(&product).Error
+	return product,err
 }
