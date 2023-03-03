@@ -11,7 +11,7 @@ type ProductRepository interface {
 	CreateProducts(product models.Product)(models.Product, error)
 	GetProduct(ID int) (models.Product, error)
 	UpdateProduct(product models.Product, ID int) (models.Product, error)
-
+	DeleteProduct(product models.Product, ID int) (models.Product,error)
 
 }
 
@@ -38,4 +38,9 @@ func (r *repository) GetProduct(ID int) (models.Product, error) {
 func (r *repository) UpdateProduct(product models.Product, ID int) (models.Product,error) {
 	err := r.db.Save(&product).Error
 	return product,err
+}
+
+func (r *repository) DeleteProduct(product models.Product, ID int) (models.Product,error) {
+	err := r.db.Delete(&product).Error
+	return product, err
 }
