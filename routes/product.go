@@ -12,5 +12,6 @@ func ProductRoutes(e *echo.Group) {
 	ProductRepository := repositories.RepositoryProduct(mysql.ConnDB)
 	h := handlers.HandlerProduct(ProductRepository)
 
-	e.GET("/product", h.FindProducts)
+	e.GET("/products", h.FindProducts)
+	e.POST("/product", h.CreateProducts)
 }
