@@ -6,6 +6,7 @@ import (
 	"backEnd/models"
 	"backEnd/repositories"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -44,6 +45,17 @@ func (h *productHandler) CreateProducts(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, result.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
 	}
 	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convProduct(data)})
+}
+
+func (h *productHandler) GetProducts(c echo.Context) error {
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	products, err := h.ProductRepository.GetProduct(id)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convProduct(products)})
 }
 
 func convProduct (u models.Product) dto.ProductResponse{

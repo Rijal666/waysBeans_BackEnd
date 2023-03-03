@@ -9,6 +9,8 @@ import (
 type ProductRepository interface {
 	FindProduct() ([]models.Product, error)
 	CreateProducts(product models.Product)(models.Product, error)
+	GetProduct(ID int) (models.Product, error)
+
 }
 
 func RepositoryProduct(db *gorm.DB) *repository {
@@ -24,4 +26,10 @@ func (r *repository) FindProduct() ([]models.Product, error) {
 func (r *repository) CreateProducts(product models.Product) (models.Product,error) {
 	err := r.db.Create(&product).Error
 	return product, err
+}
+func (r *repository) GetProduct(ID int) (models.Product, error) {
+	var products models.Product
+	err := r.db.First(&products, ID).Error
+
+	return products, err
 }
