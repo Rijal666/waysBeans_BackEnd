@@ -5,9 +5,12 @@ import (
 	"backEnd/dto/result"
 	"backEnd/models"
 	"backEnd/repositories"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
 
@@ -29,23 +32,45 @@ func (h *productHandler) FindProducts(c echo.Context) error {
 }
 
 func (h *productHandler) CreateProducts(c echo.Context) error {
-	request := new(dto.CreateProductRequest)
-	if err := c.Bind(request); err != nil {
-		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+	dataFile := c.Get("dataFile").(string)
+	fmt.Println("this is data file", dataFile)
+
+	price, _:= strconv.Atoi(c.FormValue("price"))
+	stock, _:= strconv.Atoi(c.FormValue("stock"))
+
+	request := models.Product{
+		Name: c.FormValue("name"),
+		Description: c.FormValue("desciption"),
+		Price: price,
+		Stock: stock,	
+		Photo: dataFile,
+		CreateAt: time.Now(),
+		UpdateAt: time.Now(),
+	}
+	validation := validator.New()
+	err := validation.Struct(request)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error(
+			
+		)})
 	}
 	product := models.Product{
 		Name: request.Name,
 		Price: request.Price,
-		Description: request.Desciption,
-		Stock: request.Stock,	
+		Description: request.Description,
+		Stock: request.Stock,
 		Photo: request.Photo,
+		CreateAt: time.Now(),
+		UpdateAt: time.Now(),
 	}
+
 	data, err := h.ProductRepository.CreateProducts(product)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, result.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
 	}
 	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convProduct(data)})
 }
+
 
 func (h *productHandler) GetProducts(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))

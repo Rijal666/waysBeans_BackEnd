@@ -2,6 +2,7 @@ package routes
 
 import (
 	"backEnd/handlers"
+	"backEnd/pkg/middleware"
 	"backEnd/pkg/mysql"
 	"backEnd/repositories"
 
@@ -13,7 +14,7 @@ func ProductRoutes(e *echo.Group) {
 	h := handlers.HandlerProduct(ProductRepository)
 
 	e.GET("/products", h.FindProducts)
-	e.POST("/product", h.CreateProducts)
+	e.POST("/product", middleware.UploadFile(h.CreateProducts))
 	e.GET("/products/:id", h.GetProducts)
 	e.PATCH("/products/:id", h.UpdateProducts)
 	e.DELETE("/products/:id", h.DeleteProducts)
