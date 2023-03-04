@@ -10,12 +10,3 @@ type User struct {
 	CreatedAt time.Time `json:"-`
 	UpdatedAt time.Time `json:"-`
 }
-
-type UsersProfileResponse struct{
-	ID int `json:"id"`
-	Name int `json:"name"`
-}
-
-func (UsersProfileResponse) TableName() string {
-	return "users"
-}
