@@ -1,78 +1,86 @@
 package handlers
 
 import (
-	"backEnd/dto"
-	"backEnd/dto/result"
+	dto "backEnd/dto/result"
+	usersdto "backEnd/dto/user"
 	"backEnd/models"
 	"backEnd/repositories"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
 )
 
-type UserHandler struct {
-	UserRepository repositories.UserRepository
+type handler struct {
+	UserRepository        repositories.UserRepository
+	ProfileRepository     repositories.ProfileRepository
+	CartRepository        repositories.CartRepository
+	TransactionRepository repositories.TransactionRepository
 }
 
-func HandlerUser(UserRepository repositories.UserRepository) *UserHandler {
-	return &UserHandler{UserRepository}
-}
-
-func (h *UserHandler) FindUsers(c echo.Context) error {
-	users, err := h.UserRepository.FindUsers()
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+func HandlerUser(UserRepository repositories.UserRepository, ProfileRepository repositories.ProfileRepository, CartRepository repositories.CartRepository, TransactionRepository repositories.TransactionRepository) *handler {
+	return &handler{
+		UserRepository:        UserRepository,
+		ProfileRepository:     ProfileRepository,
+		CartRepository:        CartRepository,
+		TransactionRepository: TransactionRepository,
 	}
-	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: users})
 }
 
-func (h *UserHandler) GetUser(c echo.Context) error {
+func (h *handler) FindUsers(c echo.Context) error {
+	userLogin := c.Get("userLogin")
+	userAdmin := userLogin.(jwt.MapClaims)["is_admin"].(bool)
+	if userAdmin {
+		users, err := h.UserRepository.FindUsers()
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+		}
+
+		if len(users) > 0 {
+			return c.JSON(http.StatusOK, dto.SuccessResult{Status: http.StatusOK, Message: "Data for all users was successfully obtained", Data: users})
+		} else {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: "No record found"})
+		}
+	} else {
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResult{Status: http.StatusUnauthorized, Message: "Sorry, you're not Admin"})
+	}
+}
+
+func (h *handler) GetUser(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))
 
 	user, err := h.UserRepository.GetUser(id)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+		return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
 	}
-	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convertResponse(user)})
+
+	return c.JSON(http.StatusOK, dto.SuccessResult{Status: http.StatusOK, Message: "User data successfully obtained", Data: user})
 }
 
-func (h *UserHandler) CreateUser(c echo.Context) error {
-	request := new(dto.CreateUserRequest)
-	if err := c.Bind(request); err != nil {
-		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
-	}
+func (h *handler) UpdateUser(c echo.Context) error {
+	userLogin := c.Get("userLogin")
+	userId := userLogin.(jwt.MapClaims)["id"].(float64)
 
-	// data form pattern submit to pattern entity db user
-	user := models.User{
-		Name:     request.Name,
-		Email:    request.Email,
-		Password: request.Password,
-	}
-
-	data, err := h.UserRepository.CreateUser(user)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, result.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
-	}
-	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convertResponse(data)})
-}
-
-func (h *UserHandler) UpdateUser(c echo.Context) error {
-	request := new(dto.UpdateUserRequest)
+	request := new(usersdto.UpdateUserRequest)
 	if err := c.Bind(&request); err != nil {
-		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+		return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
 	}
 
-	id, _ := strconv.Atoi(c.Param("id"))
-
-	user, err := h.UserRepository.GetUser(id)
+	user, err := h.UserRepository.GetUser(int(userId))
 
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+		return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
 	}
+
+	user.IsAdmin = request.IsAdmin
+
 	if request.Name != "" {
 		user.Name = request.Name
 	}
+
 	if request.Email != "" {
 		user.Email = request.Email
 	}
@@ -81,33 +89,99 @@ func (h *UserHandler) UpdateUser(c echo.Context) error {
 		user.Password = request.Password
 	}
 
-	data, err := h.UserRepository.UpdateUser(user, id)
+	data, err := h.UserRepository.UpdateUser(user)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, result.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
 	}
-	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convertResponse(data)})
+
+	return c.JSON(http.StatusOK, dto.SuccessResult{Status: http.StatusOK, Message: "User data updated successfully", Data: convertResponse(data)})
 }
 
-func (h *UserHandler) DeleteUser(c echo.Context) error {
-	id, _ := strconv.Atoi(c.Param("id"))
+func (h *handler) DeleteUser(c echo.Context) error {
+	userLogin := c.Get("userLogin")
+	userId := userLogin.(jwt.MapClaims)["id"].(float64)
 
-	user, err := h.UserRepository.GetUser(id)
+	profiles, err := h.ProfileRepository.FindProfiles()
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, result.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+		return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+	}
+	for _, profile := range profiles {
+		if profile.UserID == int(userId) {
+			userProfile, err := h.ProfileRepository.GetProfile(profile.ID)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+			}
+			fileName := userProfile.Photo
+			dirPath := "uploads"
+
+			filePath := fmt.Sprintf("%s/%s", dirPath, fileName)
+
+			_, err = h.ProfileRepository.DeleteProfile(userProfile)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+			}
+
+			err = os.Remove(filePath)
+			if err != nil {
+				fmt.Println("Failed to delete file"+fileName+":", err)
+				return c.JSON(http.StatusInternalServerError, dto.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
+			}
+
+			fmt.Println("File " + fileName + " deleted successfully")
+		}
 	}
 
-	data, err := h.UserRepository.DeleteUser(user, id)
+	carts, err := h.CartRepository.FindCarts()
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, result.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
+		return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
 	}
-	return c.JSON(http.StatusOK, result.SuccessResult{Status: http.StatusOK, Data: convertResponse(data)})
+	for _, cart := range carts {
+		if cart.UserID == int(userId) {
+			userCart, err := h.CartRepository.GetCart(cart.ID)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+			}
+			_, err = h.CartRepository.DeleteCart(userCart)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+			}
+		}
+	}
+
+	transactions, err := h.TransactionRepository.FindTransactions()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+	}
+	for _, transaction := range transactions {
+		if transaction.UserID == int(userId) {
+			userTransaction, err := h.TransactionRepository.GetTransaction(transaction.ID)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+			}
+			_, err = h.TransactionRepository.DeleteTransaction(userTransaction)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+			}
+		}
+	}
+
+	user, err := h.UserRepository.GetUser(int(userId))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResult{Status: http.StatusBadRequest, Message: err.Error()})
+	}
+
+	data, err := h.UserRepository.DeleteUser(user)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResult{Status: http.StatusInternalServerError, Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, dto.SuccessResult{Status: http.StatusOK, Message: "User data deleted successfully", Data: convertResponse(data)})
 }
 
-func convertResponse(u models.User) dto.UserResponse {
-	return dto.UserResponse{
-		ID:       u.ID,
-		Name:     u.Name,
-		Email:    u.Email,
-		Password: u.Password,
+func convertResponse(u models.User) usersdto.UserResponse {
+	return usersdto.UserResponse{
+		ID:    u.ID,
+		Name:  u.Name,
+		Email: u.Email,
 	}
 }

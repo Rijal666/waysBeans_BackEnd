@@ -7,11 +7,19 @@ import (
 )
 
 func RunMigration() {
-	err := mysql.ConnDB.AutoMigrate(&models.Product{})
+	err := mysql.ConnDB.AutoMigrate(
+		&models.User{},
+		&models.Profile{},
+		&models.Product{},
+		&models.Cart{},
+		&models.Transaction{},
+		&models.ProductTransaction{},
+	)
 
 	if err != nil {
 		fmt.Println(err)
-		panic("migration error")
+		panic("Migration Failed")
 	}
-	fmt.Println("migration success")
+
+	fmt.Println("Migration Success")
 }

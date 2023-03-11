@@ -10,13 +10,12 @@ import (
 )
 
 func ProductRoutes(e *echo.Group) {
-	ProductRepository := repositories.RepositoryProduct(mysql.ConnDB)
-	h := handlers.HandlerProduct(ProductRepository)
+	productRepository := repositories.RepositoryProduct(mysql.ConnDB)
+	h := handlers.HandlerProduct(productRepository)
 
 	e.GET("/products", h.FindProducts)
-	e.POST("/product", middleware.UploadFile(h.CreateProducts))
-	e.GET("/products/:id", h.GetProducts)
-	e.PATCH("/products/:id", h.UpdateProducts)
-	e.DELETE("/products/:id", h.DeleteProducts)
-
+	e.GET("/product/:id", h.GetProduct)
+	e.POST("/product", middleware.Auth(middleware.UploadFile(h.CreateProduct)))
+	e.DELETE("/product/:id", middleware.Auth(h.DeleteProduct))
+	e.PATCH("/product/:id", middleware.Auth(middleware.UploadFile(h.UpdateProduct)))
 }
